@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/aarol/reload"
 	chroma_html "github.com/alecthomas/chroma/v2/formatters/html"
@@ -18,23 +21,27 @@ import (
 	"github.com/chrishrb/go-grip/defaults"
 )
 
+const defaultHTMLTitle = "go-grip - markdown preview"
+
 type Server struct {
-	parser       *Parser
-	boundingBox  bool
-	host         string
-	port         int
-	browser      bool
-	enableReload bool
+	parser        *Parser
+	boundingBox   bool
+	host          string
+	port          int
+	browser       bool
+	enableReload  bool
+	filenameTitle bool
 }
 
-func NewServer(host string, port int, boundingBox bool, browser bool, enableReload bool, parser *Parser) *Server {
+func NewServer(host string, port int, boundingBox bool, browser bool, enableReload bool, filenameTitle bool, parser *Parser) *Server {
 	return &Server{
-		host:         host,
-		port:         port,
-		boundingBox:  boundingBox,
-		browser:      browser,
-		enableReload: enableReload,
-		parser:       parser,
+		host:          host,
+		port:          port,
+		boundingBox:   boundingBox,
+		browser:       browser,
+		enableReload:  enableReload,
+		filenameTitle: filenameTitle,
+		parser:        parser,
 	}
 }
 
@@ -117,6 +124,7 @@ func (s *Server) newHandler(dir http.Dir) http.Handler {
 					BoundingBox:  s.boundingBox,
 					CssCodeLight: getCssCode("github"),
 					CssCodeDark:  getCssCode("github-dark"),
+					Title:        html.EscapeString(s.pageTitle(r.URL.Path)),
 				})
 				if err != nil {
 					log.Fatal(err)
@@ -159,6 +167,41 @@ type htmlStruct struct {
 	BoundingBox  bool
 	CssCodeLight string
 	CssCodeDark  string
+	Title        string
+}
+
+func (s *Server) pageTitle(filename string) string {
+	if !s.filenameTitle {
+		return defaultHTMLTitle
+	}
+
+	title := formatFilenameTitle(filename)
+	if title == "" {
+		return defaultHTMLTitle
+	}
+	return title
+}
+
+func formatFilenameTitle(filename string) string {
+	filename = path.Base(filename)
+	extension := path.Ext(filename)
+	if strings.EqualFold(extension, ".md") {
+		filename = strings.TrimSuffix(filename, extension)
+	}
+
+	filename = strings.Map(func(r rune) rune {
+		if r == '-' || r == '_' {
+			return ' '
+		}
+		return r
+	}, filename)
+
+	words := strings.Fields(filename)
+	for i, word := range words {
+		first, size := utf8.DecodeRuneInString(word)
+		words[i] = string(unicode.ToUpper(first)) + word[size:]
+	}
+	return strings.Join(words, " ")
 }
 
 func serveTemplate(w http.ResponseWriter, html htmlStruct) error {

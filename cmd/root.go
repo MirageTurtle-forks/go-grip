@@ -17,6 +17,7 @@ var rootCmd = &cobra.Command{
 		port, _ := cmd.Flags().GetInt("port")
 		boundingBox, _ := cmd.Flags().GetBool("bounding-box")
 		noReload, _ := cmd.Flags().GetBool("no-reload")
+		filenameTitle, _ := cmd.Flags().GetBool("filename-title")
 
 		var file string
 		if len(args) == 1 {
@@ -24,7 +25,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		parser := internal.NewParser()
-		server := internal.NewServer(host, port, boundingBox, browser, !noReload, parser)
+		server := internal.NewServer(host, port, boundingBox, browser, !noReload, filenameTitle, parser)
 		return server.Serve(file)
 	},
 }
@@ -42,4 +43,5 @@ func init() {
 	rootCmd.Flags().IntP("port", "p", 6419, "Port to use")
 	rootCmd.Flags().Bool("bounding-box", true, "Add bounding box to HTML")
 	rootCmd.Flags().Bool("no-reload", false, "Disable automatic browser reload on file changes")
+	rootCmd.Flags().Bool("filename-title", false, "Use the Markdown filename as the HTML page title")
 }
